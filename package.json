@@ -1,0 +1,56 @@
+{
+  "name": "perplexitypilot",
+  "displayName": "PerplexityPilot",
+  "publisher": "ct4nk3r",
+  "version": "0.0.1",
+  "description": "AI-powered code editing using Perplexity models, right inside VS Code.",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "perplexity.editFromPrompt",
+        "title": "Perplexity: Edit Code from Prompt"
+      }
+    ],
+    "configuration": {
+      "title": "PerplexityPilot",
+      "properties": {
+        "perplexity.model": {
+          "type": "string",
+          "default": "sonar",
+          "description": "Perplexity model name (e.g., sonar, sonar-small, etc.)."
+        },
+        "perplexity.maxTokens": {
+          "type": "number",
+          "default": 120,
+          "description": "Maximum tokens to generate for quick insertions."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run esbuild-base -- --production",
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "esbuild-base": "node esbuild.js",
+    "esbuild": "node esbuild.js --sourcemap",
+    "package": "npm run check-types && node esbuild.js --production"
+  },
+  "dependencies": {
+    "openai": "^4.57.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.102.0",
+    "esbuild": "^0.21.5",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.5.0",
+    "vsce": "^2.15.0"
+  }
+}
