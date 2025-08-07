@@ -1,71 +1,105 @@
-# codergpt README
+# PerplexityPilot
 
-This is the README for your extension "codergpt". After writing up a brief description, we recommend including the following sections.
+PerplexityPilot is a VS Code extension that brings Perplexity models into your editor for Copilot‑like assistance: inline completions (ghost text), inline selection edits, quick fixes, and a simple “edit from prompt” command.
 
-## Features
-
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- Inline completions while you type
+- Inline edit of selected code by instruction
+- Quick Fix action to improve code
+- Model switcher in Command Palette
+- Secure Perplexity API key storage in VS Code Secret Storage
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- VS Code 1.102.0+
+- Perplexity API key
+- Node 18+ for development
 
-## Extension Settings
+## Installation (development)
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+1. Clone this repo
+2. Install dependencies: `npm install`
+3. Build/watch: `npm run watch` or press F5 to launch the Extension Development Host
+4. In the Dev Host, open a file and try the commands below
 
-For example:
+## Commands
 
-This extension contributes the following settings:
+- Perplexity: Edit Code from Prompt  
+  Prompts you for a goal and inserts a single generated line at the end of the active file.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+- Perplexity: Inline Edit Selection  
+  Select code, run the command, describe the change, and it replaces the selection.
 
-## Known Issues
+- Perplexity: Switch Model  
+  Quick-pick of supported Perplexity models and updates your setting.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+Inline completions are enabled automatically when the extension activates. Use “Trigger Inline Suggestion” to force a suggestion if needed.
 
-## Release Notes
+## Settings
 
-Users appreciate release notes as you update your extension.
+- `perplexity.model`  
+  Default: `sonar`  
+  Allowed: `sonar`, `sonar-reasoning`, `sonar-pro`, `sonar-reasoning-pro`, `sonar-deep-research`, `r1-1776`  
+  The extension validates and falls back to `sonar` if an unsupported model is selected.
 
-### 1.0.0
+- `perplexity.maxTokens`  
+  Default: `120`  
+  Maximum tokens used for quick generations.
 
-Initial release of ...
+## API Key
 
-### 1.0.1
+On first use, the extension prompts for your Perplexity API key and stores it in VS Code Secret Storage. To update it later, re-enter via the prompt when needed or clear it from Secret Storage.
 
-Fixed issue #.
+## Features
 
-### 1.1.0
+- Inline Completions  
+  Provides code suggestions inline (ghost text) based on the current line context.
 
-Added features X, Y, and Z.
+- Inline Edit  
+  Turns your selection and instruction into a transformed code block, replacing the selection.
 
----
+- Quick Fix / Code Action  
+  Lightbulb entry “Perplexity: Improve this code” that routes to Inline Edit.
 
-## Following extension guidelines
+- Model Switcher  
+  Quick-pick of supported models with validation.
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+## Usage Tips
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+- Inline completions work best when there’s some prefix on the current line. If nothing shows, try the “Trigger Inline Suggestion” command or continue typing a bit.
+- Use Inline Edit for refactors or targeted changes. Select the smallest code region that captures the intent.
+- Keep `perplexity.maxTokens` modest for snappier responses during editing; increase when you need longer output.
 
-## Working with Markdown
+## Example Workflow
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+1. Open a Python file
+2. Select a function
+3. Run “Perplexity: Inline Edit Selection”
+4. Instruction: “Add a docstring and type hints”
+5. Review the replacement and undo if needed
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+## Development
 
-## For more information
+- Build once: `npm run compile`
+- Watch mode: `npm run watch`
+- Package a VSIX: `npm run package` (produces `.vsix`)
+- Publish to Marketplace: use `vsce` with your publisher id
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+### Project structure
 
-**Enjoy!**
+- `src/extension.ts`  
+  Activates the extension and registers features
+
+- `src/perplexityClient.ts`  
+  OpenAI SDK client configured for Perplexity API
+
+- `src/inlineCompletions.ts`  
+  InlineCompletionItemProvider for ghost text
+
+- `src/codeActions.ts`  
+  CodeActionProvider that surfaces a quick fix
+
+- `src/commands/inlineEdit.ts`  
+  Selection-based transformation command
+
+- `src/commands/switchModel.ts`  
+  Model quick-pick with
