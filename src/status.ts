@@ -14,7 +14,7 @@ export function registerStatusBar(context: vscode.ExtensionContext) {
 
   function refresh() {
     const model = vscode.workspace.getConfiguration().get<string>("perplexity.model") || "sonar";
-    item.text = `Perplexity: ${model}`;
+    item.text = `PerplexityPilot: ${model}`;
     item.tooltip = "Switch Perplexity Model";
   }
 }

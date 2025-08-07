@@ -12,8 +12,8 @@ export function registerCodeActions(context: vscode.ExtensionContext) {
 class PerplexityActions implements vscode.CodeActionProvider {
   provideCodeActions() {
     const actions: vscode.CodeAction[] = [];
-    const fix = new vscode.CodeAction("Perplexity: Improve this code", vscode.CodeActionKind.QuickFix);
-    fix.command = { command: "perplexity.inlineEdit", title: "Perplexity: Improve this code" };
+    const fix = new vscode.CodeAction("PerplexityPilot: Improve this code", vscode.CodeActionKind.QuickFix);
+    fix.command = { command: "perplexity.inlineEdit", title: "PerplexityPilot: Improve this code" };
     actions.push(fix);
     return actions;
   }
