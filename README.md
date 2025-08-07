@@ -23,13 +23,13 @@ PerplexityPilot is a VS Code extension that brings Perplexity models into your e
 
 ## Commands
 
-- Perplexity: Edit Code from Prompt  
+- PerplexityPilot: Edit Code from Prompt  
   Prompts you for a goal and inserts a single generated line at the end of the active file.
 
-- Perplexity: Inline Edit Selection  
+- PerplexityPilot: Inline Edit Selection  
   Select code, run the command, describe the change, and it replaces the selection.
 
-- Perplexity: Switch Model  
+- PerplexityPilot: Switch Model  
   Quick-pick of supported Perplexity models and updates your setting.
 
 Inline completions are enabled automatically when the extension activates. Use “Trigger Inline Suggestion” to force a suggestion if needed.
@@ -58,7 +58,7 @@ On first use, the extension prompts for your Perplexity API key and stores it in
   Turns your selection and instruction into a transformed code block, replacing the selection.
 
 - Quick Fix / Code Action  
-  Lightbulb entry “Perplexity: Improve this code” that routes to Inline Edit.
+  Lightbulb entry “PerplexityPilot: Improve this code” that routes to Inline Edit.
 
 - Model Switcher  
   Quick-pick of supported models with validation.
@@ -73,7 +73,7 @@ On first use, the extension prompts for your Perplexity API key and stores it in
 
 1. Open a Python file
 2. Select a function
-3. Run “Perplexity: Inline Edit Selection”
+3. Run “PerplexityPilot: Inline Edit Selection”
 4. Instruction: “Add a docstring and type hints”
 5. Review the replacement and undo if needed
 

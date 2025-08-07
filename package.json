@@ -10,9 +10,9 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "perplexity.editFromPrompt", "title": "Perplexity: Edit Code from Prompt" },
-      { "command": "perplexity.inlineEdit", "title": "Perplexity: Inline Edit Selection" },
-      { "command": "perplexity.switchModel", "title": "Perplexity: Switch Model" }
+      { "command": "perplexity.editFromPrompt", "title": "PerplexityPilot: Edit Code from Prompt" },
+      { "command": "perplexity.inlineEdit", "title": "PerplexityPilot: Inline Edit Selection" },
+      { "command": "perplexity.switchModel", "title": "PerplexityPilot: Switch Model" }
     ],
     "keybindings": [
       { "command": "perplexity.inlineEdit", "key": "ctrl+alt+e", "when": "editorTextFocus" }
