@@ -10,23 +10,30 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "perplexity.editFromPrompt",
-        "title": "Perplexity: Edit Code from Prompt"
-      }
+      { "command": "perplexity.editFromPrompt", "title": "Perplexity: Edit Code from Prompt" },
+      { "command": "perplexity.inlineEdit", "title": "Perplexity: Inline Edit Selection" },
+      { "command": "perplexity.switchModel", "title": "Perplexity: Switch Model" }
     ],
+    "keybindings": [
+      { "command": "perplexity.inlineEdit", "key": "ctrl+alt+e", "when": "editorTextFocus" }
+    ],
+    "menus": {
+      "editor/context": [
+        { "command": "perplexity.inlineEdit", "when": "editorHasSelection", "group": "navigation@2" }
+      ]
+    },
     "configuration": {
       "title": "PerplexityPilot",
       "properties": {
         "perplexity.model": {
           "type": "string",
           "default": "sonar",
-          "description": "Perplexity model name (e.g., sonar, sonar-small, etc.)."
+          "description": "Perplexity model name."
         },
         "perplexity.maxTokens": {
           "type": "number",
           "default": 120,
-          "description": "Maximum tokens to generate for quick insertions."
+          "description": "Maximum tokens for quick generations."
         }
       }
     }
