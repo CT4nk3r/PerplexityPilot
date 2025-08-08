@@ -62,6 +62,15 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
       const cfg = vscode.workspace.getConfiguration();
       const model = (cfg.get<string>("perplexity.model") ?? "sonar").toString();
 
+      // base max tokens
+      let maxTokens = 800;
+
+      // Adjust maxTokens dynamically, e.g. allow 1.5x tokens per user message length (characters/4 for rough tokens)
+      const approxInputTokens = Math.ceil(userMessage.length / 4);
+
+      // Cap maxTokens between 800 and 2000
+      maxTokens = Math.min(Math.max(800, approxInputTokens * 2), 2000);
+
       const system = [
         "You are a helpful AI assistant embedded in VS Code.",
         "When code context is provided, prioritize concrete, actionable suggestions referencing the code.",
@@ -85,7 +94,7 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
         model,
         messages,
         temperature: 0.4,
-        max_tokens: 800,
+        max_tokens: maxTokens,
       });
 
       return response.choices?.[0]?.message?.content?.trim() ?? "[No response]";
@@ -94,7 +103,8 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
       const msg = typeof error?.message === "string" ? error.message : "Unknown error calling Perplexity API";
       return `[Error] ${msg}`;
     }
-  }
+}
+
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
     const nonce = this._getNonce();
@@ -139,13 +149,13 @@ function buildContextAttachment(ctx: EditorContext): string | null {
   const location = ctx.filePath ? `File: ${ctx.filePath}` : "File: [unsaved/untitled]";
   const scope = ctx.source === "selection" ? "Scope: selection" : "Scope: entire document";
 
-  return [
-    `${location}`,
-    `${scope}`,
-    `Language: ${lang}`,
-    "Code:",
-    "```",
-    ctx.code,
-    "```",
-  ].join("\n");
+  const msg = `${location}
+          ${scope}
+          Language: ${lang}
+          Code:
+          \`\`\`${lang}
+          ${ctx.code}
+          \`\`\``;
+  console.log("Context Attachment:\n", msg.trim());
+  return msg.trim();
 }

@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-{{nonce}}' https://cdn.jsdelivr.net; style-src 'unsafe-inline';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-{{nonce}}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://cdnjs.cloudflare.com;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PerplexityPilot Chat</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet">
-  <script nonce="{{nonce}}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- Highlight.js theme CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet" />
+
   <style>
     body {
       font-family: var(--vscode-font-family);
@@ -34,13 +34,14 @@
       border-radius: 6px;
       max-width: 85%;
       line-height: 1.4;
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
 
     .user {
       background: var(--vscode-editorWidget-border);
       color: var(--vscode-editor-foreground);
       align-self: flex-end;
-      white-space: pre-wrap;
     }
 
     .bot {
@@ -48,7 +49,6 @@
       border: 1px solid var(--vscode-editorWidget-border);
       color: var(--vscode-editor-foreground);
       align-self: flex-start;
-      white-space: normal;
     }
 
     #inputContainer {
@@ -93,7 +93,8 @@
     }
 
     /* Actual code text */
-    .message pre code {
+    .message pre code,
+    .message pre code.hljs {
       display: block;
       padding: 12px;
       font-family: var(--vscode-editor-font-family);
@@ -122,8 +123,6 @@
       opacity: 1;
     }
   </style>
-  <script nonce="{{nonce}}" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script nonce="{{nonce}}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
   <div id="messages"></div>
@@ -133,18 +132,33 @@
   </div>
   <div class="hint">Tip: Select code to focus the answer. Without selection, I’ll use the entire file.</div>
 
+  <!-- Marked (markdown parser) -->
+  <script nonce="{{nonce}}" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Highlight.js -->
+  <script nonce="{{nonce}}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
   <script nonce="{{nonce}}">
     const vscode = acquireVsCodeApi();
     const messagesContainer = document.getElementById("messages");
     const inputBox = document.getElementById("input");
     const sendBtn = document.getElementById("sendBtn");
 
+    // Setup marked to use highlight.js for code blocks with proper language support
+    marked.setOptions({
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return code; // fallback: no highlighting
+      }
+    });
+
     function enhanceCodeBlocks(el) {
+      // Just in case, highlight any code blocks not processed by marked
       el.querySelectorAll("pre code").forEach((block) => {
-        // Highlight syntax
         hljs.highlightElement(block);
 
-        // Add copy button if not already there
+        // Add copy button if missing
         const pre = block.parentNode;
         if (!pre.querySelector(".copy-btn")) {
           const btn = document.createElement("button");
@@ -165,6 +179,7 @@
       el.className = "message " + sender;
 
       if (sender === "bot") {
+        // Render markdown to HTML (including fenced code blocks)
         el.innerHTML = marked.parse(text);
         enhanceCodeBlocks(el);
       } else {
