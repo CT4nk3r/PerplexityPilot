@@ -5,9 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-{{nonce}}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://cdnjs.cloudflare.com;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PerplexityPilot Chat</title>
-  <!-- Highlight.js theme CSS -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" rel="stylesheet" />
-
   <style>
     body {
       font-family: var(--vscode-font-family);
@@ -34,8 +32,14 @@
       border-radius: 6px;
       max-width: 85%;
       line-height: 1.4;
-      white-space: pre-wrap;
+      /* Let Markdown control flow; avoid trailing newline rendering */
+      white-space: normal;
       word-wrap: break-word;
+    }
+
+    /* Preserve user input line breaks */
+    .message.user {
+      white-space: pre-wrap;
     }
 
     .user {
@@ -81,13 +85,24 @@
       margin: 6px 0 8px 8px;
     }
 
+    /* Reset margins of Markdown blocks to avoid extra blank lines; rely on container gap */
+    .message p,
+    .message ul,
+    .message ol,
+    .message h1,
+    .message h2,
+    .message h3,
+    .message pre {
+      margin: 0;
+    }
+
     /* Code block container */
     .message pre {
       background: var(--vscode-editorGroupHeader-tabsBackground);
       border: 1px solid var(--vscode-editorWidget-border);
       border-radius: 6px;
       overflow-x: auto;
-      margin: 8px 0;
+      margin: 8px 0; /* intentional inner spacing for code blocks */
       padding: 0;
       position: relative;
     }
@@ -134,6 +149,7 @@
       background: var(--vscode-editor-background);
       border: 1px solid var(--vscode-editorWidget-border);
       color: var(--vscode-editor-foreground);
+      margin: 0; /* ensure no extra vertical gap */
     }
   </style>
 </head>
@@ -145,9 +161,7 @@
   </div>
   <div class="hint">Tip: Select code to focus the answer. Without selection, I’ll use the entire file for context.</div>
 
-  <!-- Marked (markdown parser) -->
   <script nonce="{{nonce}}" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- Highlight.js -->
   <script nonce="{{nonce}}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
   <script nonce="{{nonce}}">
@@ -156,27 +170,23 @@
     const inputBox = document.getElementById("input");
     const sendBtn = document.getElementById("sendBtn");
 
-    // Create typing indicator element but do NOT add it initially
     const typingIndicator = document.createElement("div");
     typingIndicator.textContent = "Bot is typing...";
     typingIndicator.className = "typing-indicator";
     typingIndicator.style.display = "none";
 
-    // Setup marked to use highlight.js for code blocks with proper language support
     marked.setOptions({
       highlight: function(code, lang) {
         if (lang && hljs.getLanguage(lang)) {
           return hljs.highlight(code, { language: lang }).value;
         }
-        return code; // fallback: no highlighting
+        return code;
       }
     });
 
     function enhanceCodeBlocks(el) {
       el.querySelectorAll("pre code").forEach((block) => {
         hljs.highlightElement(block);
-
-        // Add copy button if missing
         const pre = block.parentNode;
         if (!pre.querySelector(".copy-btn")) {
           const btn = document.createElement("button");
@@ -192,6 +202,10 @@
       });
     }
 
+    function sanitizeTrailingWhitespace(s) {
+      return s.replace(/\r\n?/g, "\n").replace(/\s+$/u, "");
+    }
+
     function appendMessage(text, sender) {
       if (sender === "bot") {
         hideTypingIndicator();
@@ -201,11 +215,14 @@
       el.className = "message " + sender;
 
       if (sender === "bot") {
-        const cleanedText = text.replace(/\[\d+\]/g, "");
+        const cleanedText = sanitizeTrailingWhitespace(
+          text.replace(/\[\d+\]/g, "")
+        );
         el.innerHTML = marked.parse(cleanedText);
         enhanceCodeBlocks(el);
       } else {
-        el.textContent = text;
+        const userText = sanitizeTrailingWhitespace(text);
+        el.textContent = userText;
       }
 
       messagesContainer.appendChild(el);
@@ -213,7 +230,6 @@
     }
 
     function showTypingIndicator() {
-      // Find the last user message
       const userMessages = messagesContainer.querySelectorAll(".message.user");
       const lastUserMessage = userMessages.length ? userMessages[userMessages.length - 1] : null;
 
@@ -221,7 +237,6 @@
         if (lastUserMessage) {
           lastUserMessage.after(typingIndicator);
         } else {
-          // If no user message, just append at end
           messagesContainer.appendChild(typingIndicator);
         }
       }
@@ -257,8 +272,6 @@
 
     window.addEventListener("message", (event) => {
       const message = event.data;
-      console.log("Received message in webview:", message);
-
       if (message.command === "botReply") {
         appendMessage(message.text, "bot");
       }
