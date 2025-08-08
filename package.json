@@ -24,7 +24,7 @@
       },
       {
         "command": "perplexity.improveCode",
-        "title": "Perplexity: Improve this code"
+        "title": "PerplexityPilot: Improve this code"
       }
     ],
     "keybindings": [

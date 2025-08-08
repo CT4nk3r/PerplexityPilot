@@ -18,8 +18,8 @@ class PerplexityActions implements vscode.CodeActionProvider {
     const selection = range as vscode.Selection;
     if (selection.isEmpty) return;
 
-    const fix = new vscode.CodeAction("Perplexity: Improve this code", vscode.CodeActionKind.QuickFix);
-    fix.command = { command: "perplexity.inlineEdit", title: "Perplexity: Improve this code" };
+    const fix = new vscode.CodeAction("PerplexityPilot: Improve this code", vscode.CodeActionKind.QuickFix);
+    fix.command = { command: "perplexity.inlineEdit", title: "PerplexityPilot: Improve this code" };
     return [fix];
   }
 }
