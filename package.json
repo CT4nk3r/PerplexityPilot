@@ -71,6 +71,23 @@
           "description": "Maximum tokens for quick generations."
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "perplexity",
+          "title": "PerplexityPilot",
+          "icon": "media/perplexity-color.svg"
+        }
+      ]
+    },
+    "views": {
+      "perplexity": [
+        {
+          "id": "perplexityChat.sidebar",
+          "name": "PerplexityPilot Chat"
+        }
+      ]
     }
   },
   "scripts": {
