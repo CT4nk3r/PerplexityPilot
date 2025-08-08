@@ -1,7 +1,39 @@
 import * as vscode from "vscode";
 import OpenAI from "openai";
 
+let applyItem: vscode.StatusBarItem | undefined;
+let cancelItem: vscode.StatusBarItem | undefined;
+
+// Shared state for the current inline edit session:
+let currentEditor: vscode.TextEditor | undefined;
+let currentSelection: vscode.Selection | undefined;
+let currentOriginalText: string | undefined;
+
 export function registerInlineEdit(context: vscode.ExtensionContext) {
+  // Register internal commands once
+  const applyCmd = vscode.commands.registerCommand("perplexity.inlineEdit.applyInternal", async () => {
+    if (!currentEditor) return disposeStatusBarItems();
+
+    disposeStatusBarItems();
+
+    try {
+      await currentEditor.document.save();
+      vscode.window.showInformationMessage("Perplexity edit applied.");
+    } catch {
+      vscode.window.showInformationMessage("Perplexity edit kept (unsaved).");
+    }
+  });
+
+  const cancelCmd = vscode.commands.registerCommand("perplexity.inlineEdit.cancelInternal", async () => {
+    if (!currentEditor || !currentSelection || currentOriginalText === undefined) return disposeStatusBarItems();
+
+    disposeStatusBarItems();
+
+    await revertSelection(currentEditor, currentSelection, currentOriginalText);
+    vscode.window.showInformationMessage("Perplexity edit canceled.");
+  });
+
+  // Register main inline edit command
   const cmd = vscode.commands.registerCommand("perplexity.inlineEdit", async () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
@@ -14,7 +46,7 @@ export function registerInlineEdit(context: vscode.ExtensionContext) {
     }
 
     const instruction = await vscode.window.showInputBox({
-      prompt: "Describe the change to apply to the selection."
+      prompt: "Describe the change to apply to the selection.",
     });
     if (!instruction) return;
 
@@ -25,68 +57,160 @@ export function registerInlineEdit(context: vscode.ExtensionContext) {
     }
 
     const cfg = vscode.workspace.getConfiguration();
-    const model = cfg.get<string>("perplexity.model") || "sonar";
+    const model = (cfg.get<string>("perplexity.model") ?? "sonar").toString();
     const maxTokensSetting = cfg.get<number>("perplexity.maxTokens") ?? 120;
-    const maxTokens = Math.max(256, Math.min(4096, maxTokensSetting * 4));
+    const baseMaxTokens = Math.max(256, Math.min(4096, maxTokensSetting * 4));
     const client = new OpenAI({ apiKey, baseURL: "https://api.perplexity.ai" });
 
     const lang = editor.document.languageId || "plaintext";
 
     const system =
       "You are a precise code transformation engine. Apply the user's instruction to the given selection and return ONLY the full edited selection as code, in the same language. Do not include commentary or code fences.";
+
     const user = [
       `Language: ${lang}`,
       `Instruction: ${instruction}`,
       `Return: the full edited selection only (no backticks, no prose).`,
       `--- ORIGINAL SELECTION ---`,
       original,
-      `--- END ORIGINAL ---`
+      `--- END ORIGINAL ---`,
     ].join("\n");
 
-    let raw = "";
+    let accumulated = "";
+    let finishReason: string | null = null;
 
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: "PerplexityPilot: Applying inline edit…",
-        cancellable: false
+        cancellable: false,
       },
       async () => {
         const res = await client.chat.completions.create({
           model,
           temperature: 0.1,
-          max_tokens: maxTokens,
+          max_tokens: baseMaxTokens,
           messages: [
             { role: "system", content: system },
-            { role: "user", content: user }
-          ]
+            { role: "user", content: user },
+          ],
         });
-        raw = (res.choices?.[0]?.message?.content ?? "").toString();
+
+        accumulated = (res.choices?.[0]?.message?.content ?? "").toString();
+        finishReason = res.choices?.[0]?.finish_reason ?? null;
       }
     );
 
-    const proposed = stripFences(raw).trim();
-    if (!proposed) {
+    accumulated = stripFences(accumulated).trim();
+
+    if (!accumulated) {
       const fallback = trySimpleRemove(original, instruction);
       if (!fallback) {
         vscode.window.showWarningMessage("No edit returned.");
         return;
       }
       await previewReplace(editor.document.uri, selection, fallback);
-      await showApplyCancel(editor, selection, original);
+      showApplyCancel();
+      // Save context for internal commands
+      setCurrentContext(editor, selection, original);
       return;
     }
 
-    if (normalize(proposed) === normalize(original)) {
+    if (normalize(accumulated) === normalize(original)) {
       vscode.window.showInformationMessage("No meaningful changes detected for this selection.");
       return;
     }
 
-    await previewReplace(editor.document.uri, selection, proposed);
-    await showApplyCancel(editor, selection, original);
+    if (finishReason === "length") {
+      const continueChoice = await vscode.window.showInformationMessage(
+        "PerplexityPilot: Output may be truncated. Continue generation?",
+        "Continue",
+        "Skip"
+      );
+
+      if (continueChoice === "Continue") {
+        const continueMsg = [
+          `Language: ${lang}`,
+          `Continue the edited selection from where you left off. Do not repeat lines already provided.`,
+          `--- CONTEXT (last 40 lines) ---`,
+          tailLines(accumulated, 40),
+          `--- END CONTEXT ---`,
+        ].join("\n");
+
+        const maxContTokens = Math.min(4096, Math.round(baseMaxTokens * 1.5));
+
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "PerplexityPilot: Continuing inline edit generation…",
+            cancellable: false,
+          },
+          async () => {
+            const contRes = await client.chat.completions.create({
+              model,
+              temperature: 0.1,
+              max_tokens: maxContTokens,
+              messages: [
+                { role: "system", content: system },
+                { role: "user", content: user },
+                { role: "assistant", content: accumulated },
+                { role: "user", content: continueMsg },
+              ],
+            });
+
+            const continuation = contRes.choices?.[0]?.message?.content ?? "";
+            accumulated += "\n" + stripFences(continuation).trim();
+          }
+        );
+      }
+    }
+
+    await previewReplace(editor.document.uri, selection, accumulated);
+    showApplyCancel();
+
+    // Save context for internal commands
+    setCurrentContext(editor, selection, original);
   });
 
-  context.subscriptions.push(cmd);
+  context.subscriptions.push(cmd, applyCmd, cancelCmd);
+}
+
+function setCurrentContext(editor: vscode.TextEditor, selection: vscode.Selection, original: string) {
+  currentEditor = editor;
+  currentSelection = selection;
+  currentOriginalText = original;
+}
+
+function disposeStatusBarItems() {
+  applyItem?.hide();
+  applyItem?.dispose();
+  applyItem = undefined;
+  cancelItem?.hide();
+  cancelItem?.dispose();
+  cancelItem = undefined;
+
+  // Clear the current context
+  currentEditor = undefined;
+  currentSelection = undefined;
+  currentOriginalText = undefined;
+}
+
+function showApplyCancel() {
+  if (!applyItem) {
+    applyItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
+    applyItem.text = "$(check) Apply";
+    applyItem.tooltip = "Apply and keep changes";
+    applyItem.command = "perplexity.inlineEdit.applyInternal";
+  }
+  if (!cancelItem) {
+    cancelItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 999);
+    cancelItem.text = "$(discard) Cancel";
+    cancelItem.tooltip = "Discard changes";
+    cancelItem.command = "perplexity.inlineEdit.cancelInternal";
+  }
+
+  applyItem.show();
+  cancelItem.show();
 }
 
 async function previewReplace(uri: vscode.Uri, sel: vscode.Selection, text: string) {
@@ -101,70 +225,23 @@ async function revertSelection(editor: vscode.TextEditor, sel: vscode.Selection,
   await vscode.workspace.applyEdit(we);
 }
 
-async function showApplyCancel(editor: vscode.TextEditor, sel: vscode.Selection, original: string) {
-  const applyItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
-  const cancelItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 999);
-  applyItem.text = "$(check) Apply";
-  cancelItem.text = "$(discard) Cancel";
-  applyItem.tooltip = "Apply and keep changes";
-  cancelItem.tooltip = "Discard changes";
-
-  const disposeAll = () => {
-    applyItem.hide();
-    cancelItem.hide();
-    applyItem.dispose();
-    cancelItem.dispose();
-  };
-
-  applyItem.command = {
-    title: "Apply Inline Edit",
-    command: "perplexity.inlineEdit.applyInternal"
-  };
-  cancelItem.command = {
-    title: "Cancel Inline Edit",
-    command: "perplexity.inlineEdit.cancelInternal"
-  };
-
-  applyItem.show();
-  cancelItem.show();
-
-  const applyCmd = vscode.commands.registerCommand("perplexity.inlineEdit.applyInternal", async () => {
-    disposeAll();
-    try {
-      await editor.document.save();
-      vscode.window.showInformationMessage("Perplexity edit applied.");
-    } catch {
-      vscode.window.showInformationMessage("Perplexity edit kept (unsaved).");
-    }
-    applyCmd.dispose();
-    cancelCmd.dispose();
-  });
-
-  const cancelCmd = vscode.commands.registerCommand("perplexity.inlineEdit.cancelInternal", async () => {
-    disposeAll();
-    await revertSelection(editor, sel, original);
-    vscode.window.showInformationMessage("Perplexity edit canceled.");
-    applyCmd.dispose();
-    cancelCmd.dispose();
-  });
-}
-
 function stripFences(s: string): string {
   if (!s) return "";
   let out = s.trim();
-
-  // Remove exactly one leading ```
+  // Remove leading ```
   out = out.replace(/^\s*```[a-zA-Z0-9_-]*\s*\r?\n/, "");
-
-  // Remove exactly one trailing ```
+  // Remove trailing ```
   out = out.replace(/\r?\n\s*```\s*$/, "");
-
   return out.trim();
 }
 
-
 function normalize(s: string): string {
   return s.replace(/\s+$/gm, "").trim();
+}
+
+function tailLines(s: string, n: number): string {
+  const arr = s.split(/\r?\n/);
+  return arr.slice(-n).join("\n");
 }
 
 function trySimpleRemove(original: string, instruction: string): string | null {
@@ -180,10 +257,12 @@ function trySimpleRemove(original: string, instruction: string): string | null {
 
   const lines = original.split(/\r?\n/);
   const lowered = patterns.map((p) => p.toLowerCase());
+
   const out = lines.filter((line) => {
     const ll = line.toLowerCase();
     return !lowered.some((p) => ll.includes(p));
   });
+
   const joined = out.join("\n");
   if (normalize(joined) === normalize(original)) return null;
   return joined;

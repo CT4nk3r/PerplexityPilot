@@ -1,0 +1,168 @@
+import * as vscode from "vscode";
+import OpenAI from "openai";
+import * as fs from 'fs';
+import * as path from 'path';
+
+
+type EditorContext = {
+  filePath: string | null;
+  languageId: string | null;
+  code: string | null; // selection or full document
+  source: "selection" | "document" | "none";
+};
+
+export class ChatSidebarProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = "perplexitypilot.sidebar";
+
+  private _view?: vscode.WebviewView;
+
+  constructor(
+    private readonly _context: vscode.ExtensionContext,
+    private readonly _client: OpenAI,
+    private readonly _apiKeyMissing: boolean
+  ) {}
+
+  public resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    _context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
+  ) {
+    this._view = webviewView;
+
+    webviewView.webview.options = { enableScripts: true };
+
+    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+
+    webviewView.webview.onDidReceiveMessage(async (message) => {
+      switch (message.command) {
+        case "sendMessage": {
+          const userMessage: string = (message.text ?? "").toString().trim();
+          if (!userMessage) return;
+
+          if (this._apiKeyMissing) {
+            webviewView.webview.postMessage({
+              command: "botReply",
+              text: "[No API key set. Store your Perplexity API key in VS Code secrets to use chat.]",
+            });
+            return;
+          }
+          const ctx = getEditorContext();
+
+          webviewView.webview.postMessage({ command: "botTyping", typing: true });
+
+          // Force VS Code/webview to process the typing message before continuing
+          await new Promise((resolve) => setTimeout(resolve, 50));  // 50 ms delay
+
+          const botReply = await this.getPerplexityReply(userMessage, ctx);
+
+          webviewView.webview.postMessage({ command: "botTyping", typing: false });
+          webviewView.webview.postMessage({ command: "botReply", text: botReply });
+
+          break;
+        }
+      }
+    });
+  }
+
+  private async getPerplexityReply(userMessage: string, ctx: EditorContext): Promise<string> {
+    try {
+      const cfg = vscode.workspace.getConfiguration();
+      const model = (cfg.get<string>("perplexity.model") ?? "sonar").toString();
+
+      // base max tokens
+      let maxTokens = 800;
+
+      // Adjust maxTokens dynamically, e.g. allow 1.5x tokens per user message length (characters/4 for rough tokens)
+      const approxInputTokens = Math.ceil(userMessage.length / 4);
+
+      // Cap maxTokens between 800 and 2000
+      maxTokens = Math.min(Math.max(800, approxInputTokens * 2), 2000);
+
+      const system = [
+        "You are a helpful AI assistant embedded in VS Code.",
+        "When code context is provided, prioritize concrete, actionable suggestions referencing the code.",
+        "Be concise unless asked otherwise."
+      ].join(" ");
+
+      const contextAttachment = buildContextAttachment(ctx);
+
+      const messages = [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: [
+            userMessage,
+            contextAttachment ? "\n--- ACTIVE EDITOR CONTEXT ---\n" + contextAttachment + "\n--- END CONTEXT ---" : "",
+          ].join("")
+        }
+      ] as any;
+
+      const response = await this._client.chat.completions.create({
+        model,
+        messages,
+        temperature: 0.4,
+        max_tokens: maxTokens,
+      });
+
+      return response.choices?.[0]?.message?.content?.trim() ?? "[No response]";
+    } catch (error: any) {
+      console.error("Perplexity chat error:", error);
+      const msg = typeof error?.message === "string" ? error.message : "Unknown error calling Perplexity API";
+      return `[Error] ${msg}`;
+    }
+}
+
+
+  private _getHtmlForWebview(webview: vscode.Webview): string {
+    const nonce = this._getNonce();
+    const htmlPath = path.join(this._context.extensionPath, 'media', 'webview.html');
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    html = html.replace(/{{nonce}}/g, nonce);
+    return html;
+}
+
+
+  private _getNonce(): string {
+    let text = "";
+    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    for (let i = 0; i < 32; i++) text += possible.charAt(Math.floor(Math.random() * possible.length));
+    return text;
+  }
+}
+
+function getEditorContext(): EditorContext {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return { filePath: null, languageId: null, code: null, source: "none" };
+  }
+
+  const doc = editor.document;
+  const sel = editor.selection;
+  const selectedText = doc.getText(sel);
+  const hasSelection = sel && !sel.isEmpty && selectedText.trim().length > 0;
+
+  const code = hasSelection ? selectedText : doc.getText();
+  const source: EditorContext["source"] = hasSelection ? "selection" : "document";
+  const filePath = doc.uri.fsPath || null;
+  const languageId = doc.languageId || null;
+
+  return { filePath, languageId, code, source };
+}
+
+function buildContextAttachment(ctx: EditorContext): string | null {
+  if (!ctx.code) return null;
+
+  const lang = ctx.languageId ?? "plaintext";
+  const location = ctx.filePath ? `File: ${ctx.filePath}` : "File: [unsaved/untitled]";
+  const scope = ctx.source === "selection" ? "Scope: selection" : "Scope: entire document";
+
+  const msg = `${location}
+          ${scope}
+          Language: ${lang}
+          Code:
+          \`\`\`${lang}
+          ${ctx.code}
+          \`\`\``;
+  console.log("Context Attachment:\n", msg.trim());
+  return msg.trim();
+}
