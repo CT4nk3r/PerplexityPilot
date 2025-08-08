@@ -46,11 +46,18 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
             });
             return;
           }
-
           const ctx = getEditorContext();
+
+          webviewView.webview.postMessage({ command: "botTyping", typing: true });
+
+          // Force VS Code/webview to process the typing message before continuing
+          await new Promise((resolve) => setTimeout(resolve, 50));  // 50 ms delay
+
           const botReply = await this.getPerplexityReply(userMessage, ctx);
 
+          webviewView.webview.postMessage({ command: "botTyping", typing: false });
           webviewView.webview.postMessage({ command: "botReply", text: botReply });
+
           break;
         }
       }
