@@ -75,17 +75,19 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "perplexity",
+          "id": "perplexitypilot",
           "title": "PerplexityPilot",
           "icon": "media/perplexity-color.svg"
         }
       ]
     },
     "views": {
-      "perplexity": [
+      "perplexitypilot": [
         {
-          "id": "perplexityChat.sidebar",
-          "name": "PerplexityPilot Chat"
+          "type": "webview",
+          "id": "perplexitypilot.sidebar",
+          "name": "PerplexityPilot Chat",
+          "icon": "media/perplexity-color.svg"
         }
       ]
     }
