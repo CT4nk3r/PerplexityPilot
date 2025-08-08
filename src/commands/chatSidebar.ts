@@ -1,5 +1,8 @@
 import * as vscode from "vscode";
 import OpenAI from "openai";
+import * as fs from 'fs';
+import * as path from 'path';
+
 
 type EditorContext = {
   filePath: string | null;
@@ -93,88 +96,14 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private _getHtmlForWebview(_webview: vscode.Webview): string {
+  private _getHtmlForWebview(webview: vscode.Webview): string {
     const nonce = this._getNonce();
+    const htmlPath = path.join(this._context.extensionPath, 'media', 'webview.html');
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    html = html.replace(/{{nonce}}/g, nonce);
+    return html;
+}
 
-    return `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; style-src 'unsafe-inline';" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PerplexityPilot Chat</title>
-        <style>
-          body { font-family: var(--vscode-font-family); margin:0; padding:0; color:var(--vscode-foreground); background:var(--vscode-editor-background); display:flex; flex-direction:column; height:100vh; }
-          #messages { flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:10px; }
-          .message { padding:8px 12px; border-radius:6px; max-width:85%; line-height:1.4; }
-          .user { background:var(--vscode-editorWidget-border); color:var(--vscode-editor-foreground); align-self:flex-end; white-space:pre-wrap; }
-          .bot { background:var(--vscode-editor-background); border:1px solid var(--vscode-editorWidget-border); color:var(--vscode-editor-foreground); align-self:flex-start; white-space:normal; }
-          #inputContainer { padding:8px; border-top:1px solid var(--vscode-editorWidget-border); display:flex; gap:8px; }
-          #input { flex:1; font-family:var(--vscode-font-family); font-size:13px; padding:6px 8px; border-radius:4px; border:1px solid var(--vscode-editorWidget-border); background:var(--vscode-input-background); color:var(--vscode-input-foreground); outline:none; }
-          #sendBtn { padding:6px 12px; cursor:pointer; }
-          .hint { opacity:0.7; font-size:12px; margin:6px 0 8px 8px; }
-          .message pre { background: var(--vscode-editorGroupHeader-tabsBackground); padding: 8px; border-radius: 4px; overflow-x: auto; }
-          .message code { font-family: var(--vscode-editor-font-family); font-size: 12px; background: var(--vscode-editor-background); padding: 2px 4px; border-radius: 3px; }
-        </style>
-        <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-      </head>
-      <body>
-        <div id="messages"></div>
-        <div id="inputContainer">
-          <input id="input" type="text" placeholder="Ask about the code in the current file..." />
-          <button id="sendBtn">Send</button>
-        </div>
-        <div class="hint">Tip: Select code to focus the answer. Without selection, I’ll use the entire file.</div>
-
-        <script nonce="${nonce}">
-          const vscode = acquireVsCodeApi();
-          const messagesContainer = document.getElementById("messages");
-          const inputBox = document.getElementById("input");
-          const sendBtn = document.getElementById("sendBtn");
-
-          function appendMessage(text, sender) {
-            const el = document.createElement("div");
-            el.className = "message " + sender;
-            if (sender === "bot") {
-              el.innerHTML = marked.parse(text);
-            } else {
-              el.textContent = text;
-            }
-            messagesContainer.appendChild(el);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-          }
-
-          function sendCurrentInput() {
-            const text = inputBox.value.trim();
-            if (!text) return;
-            appendMessage(text, "user");
-            vscode.postMessage({ command: "sendMessage", text });
-            inputBox.value = "";
-            inputBox.focus();
-          }
-
-          sendBtn.addEventListener("click", sendCurrentInput);
-          inputBox.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              sendCurrentInput();
-            }
-          });
-
-          appendMessage("PerplexityPilot Chat ready. I’ll use your selection or the whole file for context.", "bot");
-
-          window.addEventListener("message", (event) => {
-            const message = event.data;
-            if (message.command === "botReply") {
-              appendMessage(message.text, "bot");
-            }
-          });
-        </script>
-      </body>
-      </html>
-    `;
-  }
 
   private _getNonce(): string {
     let text = "";
