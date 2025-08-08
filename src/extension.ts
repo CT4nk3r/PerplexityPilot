@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 
-import { createPerplexityClient } from "./perplexityClient";
-
 import { registerInlineEdit } from "./commands/inlineEdit";
 import { registerSwitchModel } from "./commands/switchModel";
 import { registerEditFromPrompt } from "./commands/editFromPrompt";
-import { registerInlineCompletions } from "./inlineCompletions";
-import { registerCodeActions } from "./codeActions";
+import { registerInlineCompletions } from "./commands/inlineCompletions";
+import { registerCodeActions } from "./commands/codeActions";
+import { registerImproveCodeAlias } from "./commands/improveCode";
+
 
 export function activate(context: vscode.ExtensionContext) {
   registerEditFromPrompt(context);
@@ -14,6 +14,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerCodeActions(context);
   registerInlineEdit(context);
   registerSwitchModel(context);
+  registerImproveCodeAlias(context);
 }
 
 export function deactivate() {}
