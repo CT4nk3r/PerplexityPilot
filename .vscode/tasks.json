@@ -7,6 +7,14 @@
       "label": "npm: watch",
       "isBackground": true,
       "problemMatcher": "$esbuild-watch"
+    },
+    {
+      "type": "npm",
+      "script": "esbuild",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: esbuild",
+      "detail": "node esbuild.js --sourcemap"
     }
   ]
 }

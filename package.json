@@ -10,24 +10,52 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "perplexity.editFromPrompt", "title": "PerplexityPilot: Edit Code from Prompt" },
-      { "command": "perplexity.inlineEdit", "title": "PerplexityPilot: Inline Edit Selection" },
-      { "command": "perplexity.switchModel", "title": "PerplexityPilot: Switch Model" },
-      { "command": "perplexity.improveCode", "title": "Perplexity: Improve this code" }
+      {
+        "command": "perplexity.editFromPrompt",
+        "title": "PerplexityPilot: Edit Code from Prompt"
+      },
+      {
+        "command": "perplexity.inlineEdit",
+        "title": "PerplexityPilot: Inline Edit Selection"
+      },
+      {
+        "command": "perplexity.switchModel",
+        "title": "PerplexityPilot: Switch Model"
+      },
+      {
+        "command": "perplexity.improveCode",
+        "title": "Perplexity: Improve this code"
+      }
     ],
     "keybindings": [
-      { "command": "perplexity.inlineEdit", "key": "ctrl+alt+e", "when": "editorTextFocus" }
+      {
+        "command": "perplexity.inlineEdit",
+        "key": "ctrl+alt+e",
+        "when": "editorTextFocus"
+      }
     ],
     "menus": {
       "editor/context": [
-        { "command": "perplexity.inlineEdit", "when": "editorHasSelection", "group": "navigation@2" }
+        {
+          "command": "perplexity.inlineEdit",
+          "when": "editorHasSelection",
+          "group": "navigation@2"
+        }
       ],
       "editor/title": [
-        { "command": "perplexity.inlineEdit", "when": "editorHasSelection", "group": "navigation@9" }
+        {
+          "command": "perplexity.inlineEdit",
+          "when": "editorHasSelection",
+          "group": "navigation@9"
+        }
       ],
       "editor/title/context": [
-        { "command": "perplexity.inlineEdit", "when": "editorHasSelection", "group": "1_perplexity" }
-      ]      
+        {
+          "command": "perplexity.inlineEdit",
+          "when": "editorHasSelection",
+          "group": "1_perplexity"
+        }
+      ]
     },
     "configuration": {
       "title": "PerplexityPilot",
